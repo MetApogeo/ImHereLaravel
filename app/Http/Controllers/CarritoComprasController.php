@@ -55,30 +55,74 @@ class CarritoComprasController extends Controller
 
     public function postcarritocompras(Request $request)
     {
+        $carrito = null;
         try {
+            // 1. Obtener el usuario autenticado
+            $usuarioId = Auth::id();
+            //Validar al usuario que este logeado
 
             $context = $request->all();
-            $usuarioId = Auth::id();
-            //$datos = ['numero' => $request->input('numero')];
+
+            // 2. Obtener el token de tarjeta de crédito enviado desde el frontend
+            $token = $context['datosTarjeta'];
+
+            // 3. Obtener el carrito del usuario desde el frontend
+            $products = $context['productos'];
+
+            // Obtener el monto total del carrito
+            $totalAmount = $context['total'];
+
+            // 4. Lógica para generar un pedido (crear un nuevo registro en la base de datos para representar el pedido)
 
             $carrito = Carrito_Compras::create([
                 'id_usuario' => $usuarioId,
-                'estado' => 'en_carrito',
-                'total' => $context['total'],
+                'estado' => 'pendiente',
+                'total' => $totalAmount,
             ]);
 
-            foreach ($context["productos"] as $detalle) {
+            foreach ($products as $detalle) {
                 Detalle_Transaccion::create([
                     'id_carrito' => $carrito->id,
-                    'id_producto' => $detalle['id_producto'],
-                    'cantidad' => $detalle['cantidad'],
-                    'precio' => $detalle['precio'], // Asegúrate de proporcionar el valor correcto aquí
+                    'id_producto' => $detalle['id'],
+                    'cantidad' => 1,
+                    'precio' => $detalle['precio'],
                 ]);
             }
 
-            return response()->json(['success' => true, 'data' => $carrito]);
+            // 5. Realizar el pago con Stripe utilizando el token de tarjeta
+            \Stripe\Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+            $charge = \Stripe\Charge::create([
+                'amount' => $totalAmount * 100,
+                'currency' => 'usd',
+                'source' => $token, // Utilizar el token de tarjeta como fuente de pago
+            ]);
+
+            // 7. Confirmar la compra
+            $carrito->update(['estado' => 'completo']);
+
+            // 8. Logica para guardar en inventario del juego los productos de la compra
+            // Crear detalles de transacción para cada producto en el carrito
+            /*foreach ($products as $detalle) {
+                // Actualizar el modelo del juego con la nueva información
+                $juego = Juego::where('id_usuario', $carrito->id_usuario)->first();
+
+                // Ajusta la lógica según tus necesidades
+                $productoInfo = Producto::find($detalle['id']);
+                $nueva_informacion = $juego->datos . ', ' . $productoInfo->nombre;
+                $nuevaInformacionJson = json_encode($nueva_informacion);
+
+                $juego->update(['datos' => $nuevaInformacionJson]);
+            }*/
+            // 9. Retornar una respuesta exitosa
+            return response()->json(['message' => 'Compra Exitosa'], 200);
+        } catch (\Stripe\Exception\CardException $e) {
+            //Actualizar la compra a rechadaza
+            // Manejar errores de tarjeta rechazada
+            $carrito->update(['estado' => 'rechazada']);
+            return response()->json(['error' => 'Tarjeta Declinada'], 400);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            // Manejar cualquier otro error();
+            return response()->json(['error' => 'Error al Procesar: ' . $e->getMessage()], 500);
         }
     }
 
@@ -121,7 +165,7 @@ class CarritoComprasController extends Controller
     {
         try {
             // 1. Obtener el usuario autenticado
-            $user = auth()->user();
+            $usuarioId = auth()->user();
             //Validar al usuario que este logeado
 
             $context = $request->all();
@@ -137,7 +181,7 @@ class CarritoComprasController extends Controller
             $totalAmount = $cartData['total_amount'];
 
             // 4. Lógica para generar un pedido (crear un nuevo registro en la base de datos para representar el pedido)
-            $compra = new Carrito_Compras();
+            $compra = new Carrito_Compras(/*añadir id del usuario*/);
             $compra->total = $totalAmount;
             // Puedes agregar más campos según sea necesario para tu aplicación
             $compra->save();
