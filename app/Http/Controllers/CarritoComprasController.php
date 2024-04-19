@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Carrito_Compras;
 use App\Models\Detalle_Transaccion;
 use App\Models\Juego;
+use App\Models\Usuario;
 use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -72,6 +73,20 @@ class CarritoComprasController extends Controller
             // Obtener el monto total del carrito
             $totalAmount = $context['total'];
 
+            // Inicializar la variable para almacenar la cantidad total de monedas compradas
+            $totalCoins = 0;
+
+            // Iterar sobre cada producto en el carrito
+            foreach ($products as $detalle) {
+                // Verificar si el nombre del producto contiene la palabra "OsoMoneda"
+                if (strpos($detalle['nombre'], 'OsoMoneda') !== false) {
+                    // Obtener la cantidad de monedas del nombre del producto
+                    $cantidadMonedas = (int) filter_var($detalle['nombre'], FILTER_SANITIZE_NUMBER_INT);
+                    // Sumar la cantidad de monedas al total
+                    $totalCoins += $cantidadMonedas;
+                }
+            }
+
             // 4. Lógica para generar un pedido (crear un nuevo registro en la base de datos para representar el pedido)
 
             $carrito = Carrito_Compras::create([
@@ -93,14 +108,21 @@ class CarritoComprasController extends Controller
             \Stripe\Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
             $charge = \Stripe\Charge::create([
                 'amount' => $totalAmount * 100,
-                'currency' => 'usd',
+                'currency' => 'mxn',
                 'source' => $token, // Utilizar el token de tarjeta como fuente de pago
             ]);
 
+            // 6. Actualizar el campo 'coin' del usuario con la cantidad total de monedas compradas
+            // Primero, obtén el usuario
+            $usuario = Usuario::find($usuarioId);
+            // Actualiza el campo 'coin'
+            $usuario->update(['coin' => $usuario->coin + $totalCoins]);
+
             // 7. Confirmar la compra
-            $carrito->update(['estado' => 'completo']);
+            $carrito->update(['estado' => 'completado']);
 
             // 8. Logica para guardar en inventario del juego los productos de la compra
+
             // Crear detalles de transacción para cada producto en el carrito
             /*foreach ($products as $detalle) {
                 // Actualizar el modelo del juego con la nueva información
