@@ -47,6 +47,7 @@ class ProductoController extends Controller
         if (is_null($registro)) {
             return response()->json('Data not found', 404);
         }
+        $registro->imagen = $request->imagen;
         $registro->update($request->all());
         $registro->save();
         return response()->json(['Task updated successfully.']);
@@ -71,6 +72,20 @@ class ProductoController extends Controller
             return response()->json(['success' => true, 'data' => $registro]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function uploadImagen(Request $request)
+    {
+        if ($request->hasFile('imagen')) {
+            $imagen = $request->file('imagen');
+            // Lógica para guardar la imagen en el servidor
+            $rutaImagen = $imagen->store('public/imagenes');
+
+            // Devolver la URL de la imagen almacenada
+            return response()->json(['url' => str_replace('public/imagenes/', '', $rutaImagen)]);
+        } else {
+            return response()->json(['error' => 'No se ha enviado ninguna imagen'], 400);
         }
     }
 

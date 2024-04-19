@@ -91,6 +91,7 @@ Route::post('/login', [UsuarioController::class, 'login'])->name('login');
 
 //* UpLoad Image
 Route::post('/upload-imagen', [UsuarioController::class, 'uploadImagen']);
+Route::post('/producto/upload-imagen', [UsuarioController::class, 'uploadImagen']);
 // ? FOTOS
 Route::get('/usuario/foto/{nombre_foto}', [UsuarioController::class, 'mostrar_foto']);
-Route::get('/producto/foto/{nombre_foto}', [UsuarioController::class, 'mostrar_foto']);
+Route::get('/producto/foto/{nombre_foto}', [ProductoController::class, 'mostrar_foto']);
